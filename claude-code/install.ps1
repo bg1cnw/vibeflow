@@ -1,108 +1,113 @@
 # =============================================================================
-# Claude Code Marketplace Installer (Windows PowerShell)
+# Claude Code Marketplace Installer (Windows PowerShell, local checkout)
 # =============================================================================
 #
-# Usage:
-#   irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 | iex
+# Usage from a cloned checkout:
+#   cd E:\github\vibeflow
+#   .\claude-code\install.ps1
 #
-# Optional: specify version (default installs latest)
-#   $env:VIBEFLOW_VERSION="1.1.1"; irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 | iex
+# Optional source root override:
+#   $env:VIBEFLOW_SOURCE_ROOT="E:\github\vibeflow"; .\claude-code\install.ps1
 #
-# After installation, use Claude Code to install plugins:
+# After installation, use Claude Code to install the plugin:
 #   /plugin install vibeflow@vibeflow
 #
 
 param(
-    [string]$Version = $env:VIBEFLOW_VERSION
+    [string]$SourceRoot = $env:VIBEFLOW_SOURCE_ROOT
 )
 
 $ErrorActionPreference = "Stop"
 
-# =============================================================================
-# Configuration
-# =============================================================================
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$DefaultSourceRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = $DefaultSourceRoot
+} else {
+    $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
+}
 
-$MarketplaceGitUrl = "https://github.com/ttttstc/vibeflow.git"
 $MarketplaceName = "vibeflow"
-$RepoName = "ttttstc/vibeflow"
-
-# =============================================================================
-# Paths
-# =============================================================================
-
 $ClaudePluginsDir = Join-Path $env:USERPROFILE ".claude\plugins"
 $MarketplacesDir = Join-Path $ClaudePluginsDir "marketplaces"
 $TargetDir = Join-Path $MarketplacesDir $MarketplaceName
 $KnownMarketplacesFile = Join-Path $ClaudePluginsDir "known_marketplaces.json"
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
 function Write-Info { param($Message) Write-Host "INFO: $Message" }
 function Write-Success { param($Message) Write-Host "SUCCESS: $Message" }
 function Write-Err { param($Message) Write-Host "ERROR: $Message" -ForegroundColor Red }
 
-function Normalize-Version {
-    param([string]$Value)
+function Get-SourceVersion {
+    param([string]$Root)
 
-    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -eq "latest") {
-        return "latest"
-    }
-    if ($Value -match '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$') {
-        return "v$Value"
-    }
-    return $Value
-}
-
-function Resolve-LatestVersion {
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoName/releases/latest" -Headers @{ "User-Agent" = "vibeflow-installer/1.0" }
-        if ($release.tag_name) {
-            return [string]$release.tag_name
-        }
-    } catch {
-    }
-
-    if (Get-Command git -ErrorAction SilentlyContinue) {
+    $PluginJson = Join-Path $Root ".claude-plugin\plugin.json"
+    if (Test-Path $PluginJson) {
         try {
-            $latestTag = git ls-remote --tags --refs --sort=-v:refname $MarketplaceGitUrl 2>$null |
-                ForEach-Object { ($_ -split 'refs/tags/')[-1].Trim() } |
-                Where-Object { $_ -match '^(v)?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' } |
-                Select-Object -First 1
-            if ($latestTag) {
-                return [string]$latestTag
+            $pluginContent = Get-Content $PluginJson -Raw | ConvertFrom-Json
+            if ($pluginContent.version) {
+                return [string]$pluginContent.version
             }
         } catch {
         }
     }
 
-    return "main"
+    $MarketplaceJson = Join-Path $Root ".claude-plugin\marketplace.json"
+    if (Test-Path $MarketplaceJson) {
+        try {
+            $marketplaceContent = Get-Content $MarketplaceJson -Raw | ConvertFrom-Json
+            if ($marketplaceContent.plugins -and $marketplaceContent.plugins.Count -gt 0 -and $marketplaceContent.plugins[0].version) {
+                return [string]$marketplaceContent.plugins[0].version
+            }
+        } catch {
+        }
+    }
+
+    return "unknown"
 }
 
-# =============================================================================
-# Pre-flight Check
-# =============================================================================
+function Copy-LocalTree {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw "git is not installed"
+    }
+
+    $files = & git -C $Source ls-files -co --exclude-standard
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to enumerate files from $Source"
+    }
+
+    foreach ($relativePath in $files | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+        $sourcePath = Join-Path $Source $relativePath
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            continue
+        }
+
+        $targetPath = Join-Path $Destination $relativePath
+        $targetParent = Split-Path -Parent $targetPath
+        if (-not (Test-Path -LiteralPath $targetParent)) {
+            New-Item -ItemType Directory -Force -Path $targetParent | Out-Null
+        }
+
+        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
+    }
+}
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Err "git is not installed"
     exit 1
 }
 
-Write-Info "Installing vibeflow marketplace..."
-
-$RequestedVersion = if ([string]::IsNullOrWhiteSpace($Version)) { "latest" } else { $Version }
-$ResolvedRef = Normalize-Version $Version
-if ($ResolvedRef -eq "latest") {
-    $ResolvedRef = Resolve-LatestVersion
+if (-not (Test-Path $SourceRoot)) {
+    Write-Err "source root not found: $SourceRoot"
+    exit 1
 }
 
-Write-Info "Requested version: $RequestedVersion"
-Write-Info "Resolved ref: $ResolvedRef"
-
-# =============================================================================
-# Clone or Update
-# =============================================================================
+Write-Info "Installing vibeflow marketplace from local checkout..."
+Write-Info "Source root: $SourceRoot"
 
 if (-not (Test-Path $MarketplacesDir)) {
     New-Item -ItemType Directory -Force -Path $MarketplacesDir | Out-Null
@@ -113,59 +118,18 @@ if (Test-Path $TargetDir) {
     Remove-Item $TargetDir -Recurse -Force
 }
 
-Write-Info "Cloning from: $MarketplaceGitUrl ($ResolvedRef)"
-git clone --depth 1 --branch $ResolvedRef $MarketplaceGitUrl $TargetDir 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Err "Failed to clone repository for ref $ResolvedRef"
-    exit 1
-}
+New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+Copy-LocalTree -Source $SourceRoot -Destination $TargetDir
 
-# Verify marketplace.json exists
 $MarketplaceJson = Join-Path $TargetDir ".claude-plugin\marketplace.json"
 if (-not (Test-Path $MarketplaceJson)) {
-    Write-Err "marketplace.json not found in cloned repository"
+    Write-Err "marketplace.json not found in local checkout"
     exit 1
 }
 
-# =============================================================================
-# Update version files to reflect installed tag/version
-# =============================================================================
+$CleanVersion = Get-SourceVersion -Root $TargetDir
 
-Write-Info "Updating version to $ResolvedRef..."
-
-# Strip "v" prefix if present for cleaner version display
-$CleanVersion = $ResolvedRef -replace '^v', ''
-
-# Update VERSION file
-$VersionFile = Join-Path $TargetDir "VERSION"
-[System.IO.File]::WriteAllText($VersionFile, "$CleanVersion`n", (New-Object System.Text.UTF8Encoding($false)))
-
-# Update plugin.json + marketplace.json version
-$PluginJson = Join-Path $TargetDir ".claude-plugin\plugin.json"
-try {
-    if (Test-Path $PluginJson) {
-        $pluginContent = Get-Content $PluginJson -Raw | ConvertFrom-Json
-        $pluginContent.version = $CleanVersion
-        $pluginJson = $pluginContent | ConvertTo-Json -Depth 10
-        [System.IO.File]::WriteAllText($PluginJson, $pluginJson, (New-Object System.Text.UTF8Encoding($false)))
-    }
-
-    $mpContent = Get-Content $MarketplaceJson -Raw | ConvertFrom-Json
-    if ($mpContent.plugins -and $mpContent.plugins.Count -gt 0) {
-        $mpContent.plugins[0].version = $CleanVersion
-    }
-    $mpJson = $mpContent | ConvertTo-Json -Depth 10
-    [System.IO.File]::WriteAllText($MarketplaceJson, $mpJson, (New-Object System.Text.UTF8Encoding($false)))
-    Write-Info "Manifest versions updated to $CleanVersion"
-} catch {
-    Write-Info "Warning: Could not update plugin manifests: $_"
-}
-
-# =============================================================================
-# Register in known_marketplaces.json
-# =============================================================================
-
-Write-Info "Registering marketplace..."
+Write-Info "Updating registration metadata..."
 
 if (-not (Test-Path $ClaudePluginsDir)) {
     New-Item -ItemType Directory -Force -Path $ClaudePluginsDir | Out-Null
@@ -180,24 +144,18 @@ $json = $jsonContent | ConvertFrom-Json
 
 $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000Z")
 
-# Add marketplace entry
 $marketplaceEntry = @{
     source = @{
-        source = "github"
-        repo = $RepoName
+        source = "local"
+        path = $SourceRoot
     }
     installLocation = $TargetDir
     lastUpdated = $timestamp
 }
 $json | Add-Member -MemberType NoteProperty -Name $MarketplaceName -Value $marketplaceEntry -Force
 
-# Write back with formatting
 $compact = $json | ConvertTo-Json -Depth 10 -Compress
 [System.IO.File]::WriteAllText($KnownMarketplacesFile, $compact, (New-Object System.Text.UTF8Encoding($false)))
-
-# =============================================================================
-# Verify
-# =============================================================================
 
 $verifyContent = Get-Content $KnownMarketplacesFile -Raw | ConvertFrom-Json
 if (-not $verifyContent.PSObject.Properties.Name.Contains($MarketplaceName)) {
@@ -205,18 +163,13 @@ if (-not $verifyContent.PSObject.Properties.Name.Contains($MarketplaceName)) {
     exit 1
 }
 
-# =============================================================================
-# Success
-# =============================================================================
-
 Write-Host ""
 Write-Success "VibeFlow marketplace installed successfully!"
 Write-Host ""
 Write-Host "  Marketplace key: $MarketplaceName"
+Write-Host "  Source:          $SourceRoot"
 Write-Host "  Install path:    $TargetDir"
-Write-Host "  Git repo:       $MarketplaceGitUrl"
-Write-Host "  Version:        $CleanVersion"
+Write-Host "  Version:         $CleanVersion"
 Write-Host ""
 Write-Host "To activate the plugin, run in Claude Code:"
 Write-Host "  /plugin install vibeflow@vibeflow"
-Write-Host ""

@@ -1,20 +1,31 @@
 # =============================================================================
-# VibeFlow Installer for Codex (Windows PowerShell)
+# VibeFlow Installer for Codex (Windows PowerShell, local checkout)
 # =============================================================================
 #
-# Usage:
-#   irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/codex/install.ps1 | iex
-#   $env:VIBEFLOW_VERSION="v1.0.0"; irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/codex/install.ps1 | iex
+# Usage from a cloned checkout:
+#   cd E:\github\vibeflow
+#   .\codex\install.ps1
+#
+# Optional source root override:
+#   $env:VIBEFLOW_SOURCE_ROOT="E:\github\vibeflow"; .\codex\install.ps1
+#
+# After installation, restart Codex to pick up the new skills.
 #
 
 param(
-    [string]$Version = $env:VIBEFLOW_VERSION
+    [string]$SourceRoot = $env:VIBEFLOW_SOURCE_ROOT
 )
 
 $ErrorActionPreference = "Stop"
 
-$RepoUrl = "https://github.com/ttttstc/vibeflow.git"
-$RepoName = "ttttstc/vibeflow"
+$ScriptDir = Split-Path -Parent $PSCommandPath
+$DefaultSourceRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+    $SourceRoot = $DefaultSourceRoot
+} else {
+    $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
+}
+
 $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }
 $InstallDir = Join-Path $CodexHome "vibeflow"
 $SkillsDir = Join-Path $CodexHome "skills"
@@ -23,41 +34,63 @@ function Write-Info { param($Message) Write-Host "INFO: $Message" }
 function Write-Success { param($Message) Write-Host "SUCCESS: $Message" }
 function Write-Err { param($Message) Write-Host "ERROR: $Message" -ForegroundColor Red }
 
-function Normalize-Version {
-    param([string]$Value)
+function Get-SourceVersion {
+    param([string]$Root)
 
-    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -eq "latest") {
-        return "latest"
-    }
-    if ($Value -match '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$') {
-        return "v$Value"
-    }
-    return $Value
-}
-
-function Resolve-LatestVersion {
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoName/releases/latest" -Headers @{ "User-Agent" = "vibeflow-installer/1.0" }
-        if ($release.tag_name) {
-            return [string]$release.tag_name
-        }
-    } catch {
-    }
-
-    if (Get-Command git -ErrorAction SilentlyContinue) {
+    $PluginJson = Join-Path $Root ".claude-plugin\plugin.json"
+    if (Test-Path $PluginJson) {
         try {
-            $latestTag = git ls-remote --tags --refs --sort=-v:refname $RepoUrl 2>$null |
-                ForEach-Object { ($_ -split 'refs/tags/')[-1].Trim() } |
-                Where-Object { $_ -match '^(v)?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' } |
-                Select-Object -First 1
-            if ($latestTag) {
-                return [string]$latestTag
+            $pluginContent = Get-Content $PluginJson -Raw | ConvertFrom-Json
+            if ($pluginContent.version) {
+                return [string]$pluginContent.version
             }
         } catch {
         }
     }
 
-    return "main"
+    $MarketplaceJson = Join-Path $Root ".claude-plugin\marketplace.json"
+    if (Test-Path $MarketplaceJson) {
+        try {
+            $marketplaceContent = Get-Content $MarketplaceJson -Raw | ConvertFrom-Json
+            if ($marketplaceContent.plugins -and $marketplaceContent.plugins.Count -gt 0 -and $marketplaceContent.plugins[0].version) {
+                return [string]$marketplaceContent.plugins[0].version
+            }
+        } catch {
+        }
+    }
+
+    return "unknown"
+}
+
+function Copy-LocalTree {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw "git is not installed"
+    }
+
+    $files = & git -C $Source ls-files -co --exclude-standard
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to enumerate files from $Source"
+    }
+
+    foreach ($relativePath in $files | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+        $sourcePath = Join-Path $Source $relativePath
+        if (-not (Test-Path -LiteralPath $sourcePath)) {
+            continue
+        }
+
+        $targetPath = Join-Path $Destination $relativePath
+        $targetParent = Split-Path -Parent $targetPath
+        if (-not (Test-Path -LiteralPath $targetParent)) {
+            New-Item -ItemType Directory -Force -Path $targetParent | Out-Null
+        }
+
+        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
+    }
 }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -65,15 +98,13 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-$RequestedVersion = if ([string]::IsNullOrWhiteSpace($Version)) { "latest" } else { $Version }
-$ResolvedRef = Normalize-Version $Version
-if ($ResolvedRef -eq "latest") {
-    $ResolvedRef = Resolve-LatestVersion
+if (-not (Test-Path $SourceRoot)) {
+    Write-Err "source root not found: $SourceRoot"
+    exit 1
 }
 
-Write-Info "Installing vibeflow for Codex..."
-Write-Info "Requested version: $RequestedVersion"
-Write-Info "Resolved ref: $ResolvedRef"
+Write-Info "Installing vibeflow for Codex from local checkout..."
+Write-Info "Source root: $SourceRoot"
 
 if (-not (Test-Path $CodexHome)) {
     New-Item -ItemType Directory -Force -Path $CodexHome | Out-Null
@@ -87,16 +118,12 @@ if (Test-Path $InstallDir) {
     Remove-Item $InstallDir -Recurse -Force
 }
 
-Write-Info "Cloning from: $RepoUrl ($ResolvedRef)"
-git clone --depth 1 --branch $ResolvedRef $RepoUrl $InstallDir 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Err "Failed to clone repository for ref $ResolvedRef"
-    exit 1
-}
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+Copy-LocalTree -Source $SourceRoot -Destination $InstallDir
 
 $SourceSkillsDir = Join-Path $InstallDir "skills"
 if (-not (Test-Path $SourceSkillsDir)) {
-    Write-Err "skills directory not found in cloned repository"
+    Write-Err "skills directory not found in local checkout"
     exit 1
 }
 
@@ -109,13 +136,14 @@ Get-ChildItem $SourceSkillsDir -Directory | ForEach-Object {
     New-Item -ItemType Junction -Path $TargetPath -Target $_.FullName | Out-Null
 }
 
+$InstalledVersion = Get-SourceVersion -Root $InstallDir
+
 Write-Host ""
 Write-Success "VibeFlow installed for Codex."
 Write-Host ""
-Write-Host "  Repo:    $InstallDir"
-Write-Host "  Skills:  $SkillsDir"
-if (Test-Path (Join-Path $InstallDir "VERSION")) {
-    Write-Host "  Version: $((Get-Content (Join-Path $InstallDir 'VERSION') -Raw).Trim())"
-}
+Write-Host "  Source:   $SourceRoot"
+Write-Host "  Repo:     $InstallDir"
+Write-Host "  Skills:   $SkillsDir"
+Write-Host "  Version:  $InstalledVersion"
 Write-Host ""
 Write-Host "Restart Codex to pick up the new skills."

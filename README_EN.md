@@ -45,22 +45,24 @@ In one sentence: **VibeFlow turns AI coding from chat-driven improvisation into 
 
 ## Install
 
-### Option 1: Install It Yourself
+### Option 1: Local Install
 
-Installs the latest released version by default.
+If you have already cloned the repository locally, run the scripts in this checkout instead of downloading them from GitHub raw.
 
-| Platform | Install Command | After Install |
-|---|---|---|
-| macOS / Linux | `/sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh \| bash` | run `/plugin install vibeflow@vibeflow` |
-| Windows PowerShell | `irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 \| iex` | run `/plugin install vibeflow@vibeflow` |
+| Platform | Claude Code Command | Codex Command | After Install |
+|---|---|---|---|
+| macOS / Linux | `bash ./claude-code/install.sh` | `bash ./codex/install.sh` | Claude Code: run `/plugin install vibeflow@vibeflow`; Codex: restart and run `/vibeflow` |
+| Windows PowerShell | `.\claude-code\install.ps1` | `.\codex\install.ps1` | same as above |
 
 <details>
-<summary>Pin a specific version</summary>
+<summary>Run from a different folder</summary>
 
-| Platform | Command |
+Point `VIBEFLOW_SOURCE_ROOT` at your local clone:
+
+| Platform | Example |
 |---|---|
-| macOS / Linux | `/sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh \| VIBEFLOW_VERSION=v1.0.0 bash` |
-| Windows | `$env:VIBEFLOW_VERSION="v1.0.0"; irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 \| iex` |
+| macOS / Linux | `VIBEFLOW_SOURCE_ROOT=/path/to/vibeflow bash ./codex/install.sh` |
+| Windows PowerShell | `$env:VIBEFLOW_SOURCE_ROOT="E:\github\vibeflow"; .\claude-code\install.ps1` |
 
 </details>
 
@@ -70,21 +72,23 @@ Installs the latest released version by default.
 <summary>Paste this into Claude Code</summary>
 
 ```text
-Install VibeFlow for me and make sure it actually works.
+Install VibeFlow from my local checkout and make sure it actually works.
 
 Requirements:
-1. Choose the official install command based on the current OS:
-   - macOS / Linux:
-     /sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh | bash
-   - Windows:
-     irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 | iex
-2. If I give you a version number, install that version. Otherwise install the latest released version
-3. If that fails, install it manually into the Claude Code marketplace directory
-4. After installation, run:
-   /plugin install vibeflow@vibeflow
-5. Verify the result by running /vibeflow after restart or refresh
-6. If something fails, keep debugging until it works or tell me exactly what is blocking it
-7. Then tell me:
+1. Run the local scripts directly:
+   - Claude Code:
+     - macOS / Linux: bash ./claude-code/install.sh
+     - Windows: .\claude-code\install.ps1
+   - Codex:
+     - macOS / Linux: bash ./codex/install.sh
+     - Windows: .\codex\install.ps1
+2. If I am not in the repo root, set VIBEFLOW_SOURCE_ROOT to my local clone first
+3. After installation:
+   - Claude Code should run /plugin install vibeflow@vibeflow
+   - Codex should restart and then run /vibeflow
+4. Verify the result by running /vibeflow after restart or refresh
+5. If something fails, keep debugging until it works or tell me exactly what is blocking it
+6. Then tell me:
    - whether installation succeeded
    - where it was installed
    - the installed version
@@ -95,7 +99,7 @@ Requirements:
 
 ### Other Hosts
 
-Install entry points for Codex, OpenCode, and other hosts still exist in the repository, but this README keeps the primary install path focused on Claude Code so the main onboarding flow stays clear.
+The repository also includes a Codex install path. OpenCode and other hosts may use their own integration entry points if present in the repo.
 
 ### Verify Installation
 
@@ -105,7 +109,10 @@ If you also want to verify the plugin-visible utility entries, run `/vibeflow-st
 <details>
 <summary>Update and Uninstall</summary>
 
-Update uses the same install commands. After updating, restart Claude Code and run `/plugin install vibeflow@vibeflow`.
+Update uses the same local install scripts. After updating:
+
+- Claude Code: restart/refresh and run `/plugin install vibeflow@vibeflow`
+- Codex: restart and run `/vibeflow`
 
 To uninstall: close Claude Code → remove the marketplace directory → remove the `vibeflow` entry from `known_marketplaces.json` → reopen Claude Code.
 
