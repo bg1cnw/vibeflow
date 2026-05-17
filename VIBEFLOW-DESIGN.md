@@ -2,7 +2,7 @@
 
 > Version: v1.5
 > Date: 2026-04-04
-> Status: Simplified surface aligned to `Spark -> Design -> Tasks -> Build -> Review -> Test -> Ship -> Reflect`
+> Status: Simplified surface aligned to `Spark -> Requirements -> Design -> Stories -> Prototype -> Tasks -> Build -> Review -> Test -> Ship -> Reflect`
 
 ## Related Docs
 
@@ -19,13 +19,16 @@ Its job is to keep the workflow legible, resumable, and artifact-driven without 
 User-facing lifecycle:
 
 1. Spark
-2. Design
-3. Tasks
-4. Build
-5. Review
-6. Test
-7. Ship
-8. Reflect
+2. Requirements
+3. Design
+4. Stories
+5. Prototype
+6. Tasks
+7. Build
+8. Review
+9. Test
+10. Ship
+11. Reflect
 
 ## 2. Naming Rules
 
@@ -45,11 +48,14 @@ skills/
   vibeflow/
   vibeflow-router/
   vibeflow-spark/
+  vibeflow-requirements/
   vibeflow-office-hours/
   vibeflow-plan-value-review/
   vibeflow-plan-eng-review/
   vibeflow-plan-design-review/
   vibeflow-design/
+  vibeflow-stories/
+  vibeflow-prototype/
   vibeflow-tasks/
   vibeflow-brainstorming/
   vibeflow-build-init/
@@ -98,6 +104,8 @@ Detected phases:
 - `quick`
 - `spark`
 - `design`
+- `stories`
+- `prototype`
 - `tasks`
 - `build`
 - `review`
@@ -125,9 +133,12 @@ Detected phases:
 - `docs/overview/PROJECT.md` — long-lived project context
 - `docs/overview/ARCHITECTURE.md` — long-lived project architecture
 - `docs/overview/CURRENT-STATE.md` — current workflow snapshot
+- `docs/changes/<change-id>/requirements.md` — optional formal SRS / requirements gate
 - `docs/changes/<change-id>/brief.md` — Spark artifact with goal, scope, constraints, and acceptance
 - `docs/changes/<change-id>/ucd.md` — optional UI design artifact
 - `docs/changes/<change-id>/design.md` — technical design plus review summary and scope decision
+- `docs/changes/<change-id>/stories.md` — behavior contract
+- `docs/changes/<change-id>/prototype.md` / `ui-spec.md` — prototype or UI spec when needed
 - `docs/changes/<change-id>/tasks.md` — execution-grade handoff
 - `docs/changes/<change-id>/verification/review.md` — global review report
 - `docs/changes/<change-id>/verification/system-test.md` — system test report
@@ -156,6 +167,7 @@ There is no separate user-facing build-config file anymore; execution behavior i
 - `vibeflow` — framework entry point
 - `vibeflow-router` — session router and phase dispatch
 - `vibeflow-spark` — Spark phase
+- `vibeflow-requirements` — requirements / SRS gate
 
 ### 7.2 Exploratory Layer
 
@@ -168,6 +180,8 @@ There is no separate user-facing build-config file anymore; execution behavior i
 - `vibeflow-plan-eng-review` — engineering review
 - `vibeflow-plan-design-review` — design review
 - `vibeflow-design` — technical design and inlined review summary
+- `vibeflow-stories` — behavior contract
+- `vibeflow-prototype` — prototype / flow validation
 - `vibeflow-tasks` — execution-grade planning handoff
 
 ### 7.4 Build Layer
@@ -196,7 +210,10 @@ This table is the canonical translation layer between product-facing names and i
 | 对外产品名 | 内部检测相位 / 技能 / 脚本 | 说明 |
 |---|---|---|
 | `Spark` | `spark` / `vibeflow-spark` | 产出 `brief.md` |
+| `Requirements` | `requirements` / `vibeflow-requirements` | 产出 `requirements.md`，用于正式 SRS 收口 |
 | `Design` | `design` / `vibeflow-design` | 产出 `design.md`，内含评审结论 |
+| `Stories` | `stories` / `vibeflow-stories` | 产出 `stories.md`，作为行为合同 |
+| `Prototype` | `prototype` / `vibeflow-prototype` | 产出 `prototype.md` / `ui-spec.md` |
 | `Tasks` | `tasks` / `vibeflow-tasks` | 产出 execution-grade `tasks.md` |
 | `Build` | `build` / `vibeflow-build-init` + `vibeflow-build-work` | 对外一个阶段，对内包含准备和执行两个子步骤 |
 | `Review` | `review` / `vibeflow-review` | 产出全局审查报告 |
@@ -208,8 +225,11 @@ This table is the canonical translation layer between product-facing names and i
 
 | 对外产物 | 内部实现细节 | 说明 |
 |---|---|---|
+| `requirements.md` | Requirements artifact | 取代过去更模糊的需求草稿 |
 | `brief.md` | Spark artifact | 取代过去更模糊的 `context.md` 叙事 |
 | `design.md` | design + review summary | 不再单独暴露 `design-review.md` |
+| `stories.md` | behavior contract | 供 Prototype / Tasks / Test 共用 |
+| `prototype.md` / `ui-spec.md` | prototype / UI spec | 供 Tasks / Test 使用 |
 | `tasks.md` | execution planning handoff | Build 的正式输入 |
 | `verification/` | `review.md` + `system-test.md` + `qa.md` | 对外按目录理解，对内仍保留分文件 |
 | `.vibeflow/state.json` | state + runtime resume hints | 不再单独暴露 `runtime.json` |
@@ -245,7 +265,10 @@ Users normally need only these documents:
 - `docs/overview/CURRENT-STATE.md`
 - `docs/overview/PROJECT.md`
 - `docs/overview/ARCHITECTURE.md`
+- `docs/changes/<change-id>/requirements.md`
 - `docs/changes/<change-id>/brief.md`
+- `docs/changes/<change-id>/stories.md`
+- `docs/changes/<change-id>/prototype.md` / `ui-spec.md`
 - `docs/changes/<change-id>/design.md`
 - `docs/changes/<change-id>/tasks.md`
 - `docs/changes/<change-id>/verification/`
@@ -279,7 +302,18 @@ VibeFlow should remain a control plane:
 - gates only cover things that are easy to forget and expensive to miss
 - everything else stays with the agent runtime, skill prompts, and repo artifacts
 
-## 12. Verification
+## 12. 阶段收口审计规则
+
+每个流程阶段结束时，必须执行以下审计规则方可进入下一阶段：
+
+1. 审计该阶段新增或影响的文档、链接和入口索引是否完整。
+2. 发现缺文档或缺链接时先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一阶段。
+
+此规则适用于所有主链路阶段（Spark / Requirements / Design / Stories / Prototype / Tasks / Build / Review / Test / Ship / Reflect）以及 router 触发的收口点。
+
+## 13. Verification
 
 Use these commands locally:
 
