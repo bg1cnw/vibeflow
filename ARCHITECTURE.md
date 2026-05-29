@@ -18,7 +18,7 @@ It keeps the workflow state, key artifacts, and verification evidence inside the
 
 The user-facing lifecycle is intentionally compact:
 
-`Spark -> Design -> Tasks -> Build -> Review -> Test -> Ship -> Reflect`
+`Spark -> Design -> Stories -> Prototype -> Tasks -> Build -> Review -> Test -> Ship -> Reflect`
 
 Build and Test may contain internal execution substeps, but those are implementation details rather than user-facing phases.
 
@@ -35,12 +35,14 @@ flowchart TD
     subgraph Workflow[Workflow Layer]
         W1[Spark]
         W2[Design]
-        W3[Tasks]
-        W4[Build]
-        W5[Review]
-        W6[Test]
-        W7[Ship]
-        W8[Reflect]
+        W3[Stories]
+        W4[Prototype]
+        W5[Tasks]
+        W6[Build]
+        W7[Review]
+        W8[Test]
+        W9[Ship]
+        W10[Reflect]
     end
 
     subgraph Config[Config Layer]
@@ -67,22 +69,26 @@ flowchart TD
     W5 --> W6
     W6 --> W7
     W7 --> W8
+    W8 --> W9
+    W9 --> W10
 
     C1 --> C2
-    C2 --> W4
     C2 --> W6
-    C2 --> W7
     C2 --> W8
+    C2 --> W9
+    C2 --> W10
 
     H3 --> S1
     W1 --> S3
     W2 --> S3
     W3 --> S3
-    W4 --> S4
-    W5 --> S5
-    W6 --> S5
-    W7 --> S6
-    W8 --> S1
+    W4 --> S3
+    W5 --> S3
+    W6 --> S4
+    W7 --> S5
+    W8 --> S5
+    W9 --> S6
+    W10 --> S1
     S2 --> H2
 ```
 
@@ -92,13 +98,15 @@ flowchart TD
 
 1. `spark`
 2. `design`
-3. `tasks`
-4. `build`
-5. `review`
-6. `test`
-7. `ship`
-8. `reflect`
-9. `done`
+3. `stories`
+4. `prototype`
+5. `tasks`
+6. `build`
+7. `review`
+8. `test`
+9. `ship`
+10. `reflect`
+11. `done`
 
 There is also a special `increment` entry and a `quick` mode path for low-risk changes.
 
@@ -134,6 +142,8 @@ Important project artifacts:
 - `docs/overview/CURRENT-STATE.md`
 - `docs/changes/<change-id>/brief.md`
 - `docs/changes/<change-id>/design.md`
+- `docs/changes/<change-id>/stories.md`
+- `docs/changes/<change-id>/prototype.md`
 - `docs/changes/<change-id>/tasks.md`
 - `docs/changes/<change-id>/verification/review.md`
 - `docs/changes/<change-id>/verification/system-test.md`
@@ -171,6 +181,8 @@ Output:
 - `quick`
 - `spark`
 - `design`
+- `stories`
+- `prototype`
 - `tasks`
 - `build`
 - `review`

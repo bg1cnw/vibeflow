@@ -18,6 +18,22 @@ design:
       skill: "vibeflow-design"
       required: true
 
+stories:
+  skill: "vibeflow-stories"
+  required: true
+  modes:
+    - user
+    - system
+    - lite
+
+prototype:
+  skill: "vibeflow-prototype"
+  required: true
+  modes:
+    - ui
+    - flow
+    - skipped
+
 tasks:
   skill: "vibeflow-tasks"
   required: true

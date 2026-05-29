@@ -9,7 +9,7 @@
     {
       "name": "vibeflow",
       "description": "VibeFlow skill library: full 16-phase workflow with plan reviews, safety guards, brainstorming, and office-hours.",
-      "version": "1.1.2",
+      "version": "1.1.3",
       "source": "./",
       "author": {
         "name": "VibeFlow",

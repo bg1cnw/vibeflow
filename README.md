@@ -46,22 +46,24 @@ VibeFlow 不替智能体思考，也不试图再造一个执行内核。它做�
 
 ## 安装
 
-### 方式一：自己安装
+### 方式一：本地安装
 
-默认安装最新发布版本。
+如果你已经把仓库 clone 到本地，推荐直接运行仓库里的安装脚本，不再从 GitHub raw 下载。
 
-| 平台 | 安装命令 | 安装后 |
-|---|---|---|
-| macOS / Linux | `/sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh \| bash` | 运行 `/plugin install vibeflow@vibeflow` |
-| Windows PowerShell | `irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 \| iex` | 运行 `/plugin install vibeflow@vibeflow` |
+| 平台 | Claude Code 安装命令 | Codex 安装命令 | 安装后 |
+|---|---|---|---|
+| macOS / Linux | `bash ./claude-code/install.sh` | `bash ./codex/install.sh` | Claude Code 运行 `/plugin install vibeflow@vibeflow`；Codex 重启后直接运行 `/vibeflow` |
+| Windows PowerShell | `.\claude-code\install.ps1` | `.\codex\install.ps1` | 同上 |
 
 <details>
-<summary>指定版本安装</summary>
+<summary>如果脚本不是从仓库根目录运行</summary>
 
-| 平台 | 命令 |
+先把 `VIBEFLOW_SOURCE_ROOT` 指向你的本地 clone：
+
+| 平台 | 示例 |
 |---|---|
-| macOS / Linux | `/sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh \| VIBEFLOW_VERSION=v1.0.0 bash` |
-| Windows | `$env:VIBEFLOW_VERSION="v1.0.0"; irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 \| iex` |
+| macOS / Linux | `VIBEFLOW_SOURCE_ROOT=/path/to/vibeflow bash ./codex/install.sh` |
+| Windows PowerShell | `$env:VIBEFLOW_SOURCE_ROOT="E:\github\vibeflow"; .\claude-code\install.ps1` |
 
 </details>
 
@@ -71,22 +73,25 @@ VibeFlow 不替智能体思考，也不试图再造一个执行内核。它做�
 <summary>粘贴以下内容到 Claude Code</summary>
 
 ```text
-帮我安装 VibeFlow，并确保最后能正常使用。
+帮我把已经 clone 到本地的 VibeFlow 安装好，不要再从 GitHub raw 下载脚本。
 
 要求：
-1. 根据当前系统选择官方安装命令：
-   - macOS / Linux：
-     /sh curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.sh | bash
-   - Windows：
-     irm https://raw.githubusercontent.com/ttttstc/vibeflow/main/claude-code/install.ps1 | iex
-2. 如果我给了版本号，就安装指定版本；否则安装最新发布版本
-3. 如果脚本不可用，再手动安装到 Claude Code marketplace 目录
-4. 安装完成后执行：
-   /plugin install vibeflow@vibeflow
-5. 验证安装是否成功：
-   - 重启或刷新 Claude Code 后运行 /vibeflow
+1. 直接运行本地脚本：
+   - Claude Code：
+     - macOS / Linux：bash ./claude-code/install.sh
+     - Windows：.\claude-code\install.ps1
+   - Codex：
+     - macOS / Linux：bash ./codex/install.sh
+     - Windows：.\codex\install.ps1
+2. 如果我不是在仓库根目录运行，就把 VIBEFLOW_SOURCE_ROOT 指向当前本地 clone
+3. 安装完成后：
+   - Claude Code 运行 /plugin install vibeflow@vibeflow
+   - Codex 重启后运行 /vibeflow
+4. 验证安装是否成功：
+   - Claude Code 重启或刷新后运行 /vibeflow
+   - Codex 重启后运行 /vibeflow
    - 如果没有成功，继续排查直到成功或明确告诉我卡在哪一步
-6. 最后告诉我：
+5. 最后告诉我：
    - 是否安装成功
    - 安装到了哪里
    - 当前安装版本
@@ -94,6 +99,8 @@ VibeFlow 不替智能体思考，也不试图再造一个执行内核。它做�
 ```
 
 </details>
+
+> Codex 不需要再执行 `/plugin install`；脚本会把 skills 链接到 `~/.codex/skills`，重启 Codex 后即可使用 `/vibeflow`。
 
 
 ### 验证安装
@@ -104,7 +111,10 @@ VibeFlow 不替智能体思考，也不试图再造一个执行内核。它做�
 <details>
 <summary>更新与卸载</summary>
 
-更新使用与安装相同的命令。更新后重启 Claude Code 并再次执行 `/plugin install vibeflow@vibeflow`。
+更新使用与安装相同的本地脚本。更新后：
+
+- Claude Code：重启或刷新后再执行 `/plugin install vibeflow@vibeflow`
+- Codex：重启后直接使用 `/vibeflow`
 </details>
 
 ---

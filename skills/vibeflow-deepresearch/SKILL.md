@@ -213,11 +213,11 @@ DeepResearch 是**独立工具**，不是 Think 阶段的嵌入步骤。
   │
   ├──▶ 调用 vibeflow-deepresearch
   ├──▶ 4 个 Agent 并行调研
-  ├──▶ 报告归档到 docs/deepresearch/ai-agent-framework-2026-03-29.md
+  ├──▶ 报告归档到 docs/deepresearch/&lt;topic&gt;-&lt;date&gt;.md
   │
   └── 用户决定实现某个具体功能时（如"支持 Tool Calling"）
         │
-        └──▶ 读取 docs/deepresearch/ai-agent-framework-2026-03-29.md
+        └──▶ 读取 docs/deepresearch/&lt;topic&gt;-&lt;date&gt;.md
         └──▶ 参考竞品能力矩阵和护城河分析
         └──▶ 制定差异化实现方案
 ```
@@ -235,14 +235,14 @@ Assistant：
 [发现 8 个高星竞品]
 正在启动 3 个并行分析 Agent...
 [调研完成]
-报告已保存至 docs/deepresearch/ai-agent-framework-2026-03-29.md
+报告已保存至 docs/deepresearch/&lt;topic&gt;-&lt;date&gt;.md
 
 ---
 
 用户：我要实现 Tool Calling 功能，先看看竞品怎么做的
 
 Assistant：
-正在读取调研报告 docs/deepresearch/ai-agent-framework-2026-03-29.md...
+正在读取调研报告 docs/deepresearch/&lt;topic&gt;-&lt;date&gt;.md...
 竞品分析：
 - LangChain: 原生支持，生态丰富
 - AutoGPT: 基础支持，文档完善
@@ -265,3 +265,13 @@ Assistant：
 - 搜索策略：`references/search-strategies.md`
 - Agent 提示词模板：`references/analysis-prompts.md`
 - 报告模板：`references/output-template.md`
+---
+
+## 阶段收口审计规则
+
+当本 skill 结束并准备进入下一个流程时：
+
+1. 审计相关文档、链接和入口索引是否完整。
+2. 发现缺文档或缺链接时先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一流程。

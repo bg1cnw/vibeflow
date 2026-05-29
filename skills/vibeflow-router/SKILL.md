@@ -7,7 +7,7 @@ description: 在此仓库中用于在会话开始时路由整个VibeFlow生命�
 如果此仓库包含`VIBEFLOW-DESIGN.md`，在执行阶段工作之前必须使用此路由器。
 </EXTREMELY-IMPORTANT>
 
-## 框架概述：Spark / Design / Tasks + Delivery Chain
+## 框架概述：Spark / Design / Stories / Prototype / Tasks + Delivery Chain
 
 VibeFlow 对外暴露两种开发模式：
 
@@ -16,8 +16,10 @@ VibeFlow 对外暴露两种开发模式：
 | 阶段 | 性质 | 说明 |
 |------|------|------|
 | Spark | 人工 | 默认先进入 Office Hours 做问题框定，完成复杂度扫描、可选 DeepResearch、可选 Roundtable、CEO 价值评估，并在收口总结后等待用户确认 |
-| Design | 人工 | 技术设计 + 三视角评审，并在阶段收口时等待用户确认是否进入 Tasks |
-| Tasks | 人工 | 执行级任务化 handoff，生成 `tasks.md` |
+| Design | 人工 | 技术设计 + 三视角评审，并在阶段收口时等待用户确认是否进入 Stories |
+| Stories | 人工 | 将需求 + 设计转成行为合同（user / system / lite），在阶段收口时等待用户确认是否进入 Prototype |
+| Prototype | 人工 | 将行为合同转成可交互原型 / UI 仿真 / 流程仿真（ui / flow / skipped），在阶段收口时等待用户确认是否进入 Tasks |
+| Tasks | 人工 | 执行级任务化 handoff，生成 `tasks.md`，等待用户确认是否进入 Build |
 | Build | 自动接管 | 进入 `build` 后默认由系统自动继续后续链路，不再逐段等待用户 |
 | Review | 自动 | 跨功能审查（架构、安全、性能）|
 | Test | 自动 | 系统测试 + QA 验证 |
@@ -128,8 +130,12 @@ cat .vibeflow/increments/queue.json 2>/dev/null || echo "No pending increments"
 | `quick` | `skills/vibeflow-quick/SKILL.md` | `.vibeflow/state.json`（含 `quick_meta`）+ `docs/changes/<change-id>/design.md` + `tasks.md` |
 | `increment` | `scripts/increment-handler.py` | 更新 feature-list.json |
 | `wiki` | `skills/vibeflow-wiki/SKILL.md` | `docs/overview/*.md` + `.vibeflow/wiki-status.json` |
+| `brainstorming` | `skills/vibeflow-brainstorming/SKILL.md` | `docs/plans/YYYY-MM-DD-<topic>-brainstorming.md` |
 | `spark` | `skills/vibeflow-spark/SKILL.md` | `docs/changes/<change-id>/brief.md` |
 | `design` | `skills/vibeflow-design/SKILL.md` | `docs/changes/<change-id>/design.md` |
+| `ucd` | `skills/vibeflow-ucd/SKILL.md` | `docs/changes/<change-id>/ucd.md` |
+| `stories` | `skills/vibeflow-stories/SKILL.md` | `docs/changes/<change-id>/stories.md` |
+| `prototype` | `skills/vibeflow-prototype/SKILL.md` | `docs/changes/<change-id>/prototype.md` / `ui-spec.md` |
 | `tasks` | `skills/vibeflow-tasks/SKILL.md` | `docs/changes/<change-id>/tasks.md` |
 | `build` | Build 后自动继续（Claude Code 默认） / `scripts/run-vibeflow-autopilot.py`（CLI 对应入口） | `feature-list.json` |
 | `review` | Build 后自动继续（默认继续） | `docs/changes/<change-id>/verification/review.md` |
@@ -174,22 +180,44 @@ Claude Code 插件里的默认行为不是停在当前子阶段等用户继续�
 python scripts/run-vibeflow-autopilot.py --project-root .
 ```
 
+## 阶段收口审计规则
+
+每个阶段结束后，必须先做文档审计：
+
+1. 检查该阶段新增或影响的文档、链接、入口索引是否完整。
+2. 发现缺文档或缺链接时，优先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一阶段。
+
+这条规则适用于 Spark、Design、Stories、Prototype、Tasks、Build、Review、Test、Ship、Reflect，以及 router 触发的收口点。
+
+---
+
 ### 阶段：`increment`
 **条件**：有待处理的增量请求。
 **操作**：读取 `scripts/increment-handler.py` 获取协议，按 FIFO 处理每个增量，更新 feature-list.json，并同步 `.vibeflow/increments/history.json` 与 `.vibeflow/state.json.phase_history`。
 
 ### 阶段：`spark`
 **条件**：用户输入功能需求，需探索灵感、确定方向和价值评估。
-**操作**：使用 `skills/vibeflow-spark/SKILL.md`。默认先进入 `skills/vibeflow-office-hours/SKILL.md` 做问题框定，并让用户确认本次验收标准；然后完成复杂度扫描，由用户选择是否执行 DeepResearch；调研后可选进入 `skills/vibeflow-roundtable/SKILL.md`；最后完成 CEO 价值评估，输出到 `docs/changes/<change-id>/brief.md`。
+**操作**：使用 `skills/vibeflow-spark/SKILL.md`。默认先进入 `skills/vibeflow-office-hours/SKILL.md` 做问题框定，并让用户确认本次验收标准；如果用户想先独立探索想法，可先走 `skills/vibeflow-brainstorming/SKILL.md`；然后完成复杂度扫描，由用户选择是否执行 DeepResearch；调研后可选进入 `skills/vibeflow-roundtable/SKILL.md`；最后完成 CEO 价值评估，输出到 `docs/changes/<change-id>/brief.md`。
 Spark 收口后必须向用户总结方向与范围，并确认是否进入 design。
 
 ### 阶段：`design`
 **条件**：spark 已完成，开始技术设计。
 **操作**：使用 `skills/vibeflow-design/SKILL.md`，输出 `docs/changes/<change-id>/design.md`。含内置步骤：UCD（如需）→ 用户审批 → AI eng review → AI design review → scope decision → 阶段产物展示与确认，并把评审结论汇总到 `design.md` 内的 review summary 章节。
 **说明**：UCD（视觉风格指南）已并入 design 阶段。无 UI 需求时跳过。
+如用户想单独产出 UCD 风格指南，可先走 `skills/vibeflow-ucd/SKILL.md`，再进入 design。
+
+### 阶段：`stories`
+**条件**：design 已批准，开始生成行为合同。
+**操作**：使用 `skills/vibeflow-stories/SKILL.md`，输出 `docs/changes/<change-id>/stories.md`。这里要明确 `story_mode`，并在收口时等待用户确认后再进入 prototype。
+
+### 阶段：`prototype`
+**条件**：stories 已批准，需要原型仿真或 UI 仿真。
+**操作**：使用 `skills/vibeflow-prototype/SKILL.md`，输出 `docs/changes/<change-id>/prototype.md` 或 `ui-spec.md`。这里要根据项目类型选择 `prototype_mode`，并在收口时等待用户确认后再进入 tasks。
 
 ### 阶段：`tasks`
-**条件**：design 已批准，开始生成执行级任务计划。
+**条件**：prototype 已批准，开始生成执行级任务计划。
 **操作**：使用 `skills/vibeflow-tasks/SKILL.md`，输出 `docs/changes/<change-id>/tasks.md`。这里必须展示全量交付计划并等待人工确认；确认前不得进入 Build。
 
 ### 阶段：`build`

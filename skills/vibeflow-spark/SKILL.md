@@ -165,7 +165,26 @@ Skill: vibeflow-plan-value-review
 - Open questions
 ```
 
-### 7. Spark 总结确认
+### 7. 阶段审计（必须执行）
+
+在进入总结确认前，必须对当前阶段产物进行自审计。使用 Agent 工具启动审计：
+
+```
+Agent: explore — 审计 Spark 阶段产物
+检查项：
+1. brief.md 是否存在且包含全部必需章节（Summary/Direction/Scope/Complexity/Value/Acceptance）
+2. DeepResearch 报告（如执行）是否存在且被 brief.md 引用
+3. state.json 中 spark checkpoint 和 artifact 路径是否正确
+4. 版本号是否标注且自洽
+```
+
+**审计规则**：
+- 缺文档 → 自己补上
+- 缺引用/缺章节 → 自己补上
+- 补完后 → 再审计
+- 直到全部通过 → 进入总结确认
+
+### 8. Spark 总结确认
 
 Spark 阶段完成后，必须向用户展示：
 - 当前方向总结
@@ -174,6 +193,7 @@ Spark 阶段完成后，必须向用户展示：
 - 是否已执行 DeepResearch
 - 是否已执行 Roundtable
 - CEO 价值评估结论
+- 阶段审计结果（通过项数/总项数）
 
 然后由用户明确确认：
 - 是否接受本次方向与范围
@@ -216,3 +236,13 @@ Spark 阶段完成后，必须向用户展示：
 **产出：** `docs/changes/<change-id>/brief.md`
 **Gate：** 价值评估拒绝 = 项目终止；通过后仍需完成 Spark 总结并获用户确认，才能进入 Design
 **链接到：** vibeflow-design（通过时）/ 项目终止（拒绝时）
+---
+
+## 阶段收口审计规则
+
+当本 skill 结束并准备进入下一个流程时：
+
+1. 审计相关文档、链接和入口索引是否完整。
+2. 发现缺文档或缺链接时先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一流程。

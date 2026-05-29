@@ -6,6 +6,27 @@
 - [ARCHITECTURE.md](ARCHITECTURE.md) - 看状态机、路由和组件关系
 - [VIBEFLOW-DESIGN.md](VIBEFLOW-DESIGN.md) - 看命名规则、文件布局和实现约定
 
+## 0. Local Install for This Repository
+
+This repository is already cloned locally. Use the in-repo installers instead of downloading scripts from GitHub raw.
+
+### Claude Code
+
+- macOS / Linux: `bash ./claude-code/install.sh`
+- Windows PowerShell: `.\claude-code\install.ps1`
+- After installation: run `/plugin install vibeflow@vibeflow`
+
+### Codex
+
+- macOS / Linux: `bash ./codex/install.sh`
+- Windows PowerShell: `.\codex\install.ps1`
+- If you are not running from the repository root, set `VIBEFLOW_SOURCE_ROOT` to the local clone path first
+- After installation: restart Codex, then run `/vibeflow`
+
+### Updating
+
+Use the same local scripts again. Claude Code still needs `/plugin install vibeflow@vibeflow` after refresh; Codex just needs a restart.
+
 ## 1. Target Project Layout
 
 A target project is expected to accumulate these artifacts over time:

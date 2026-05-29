@@ -1,126 +1,154 @@
 #!/usr/bin/env bash
-# VibeFlow installer for Codex (macOS / Linux)
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/codex/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/ttttstc/vibeflow/main/codex/install.sh | VIBEFLOW_VERSION=v1.0.0 bash
+# VibeFlow installer for Codex (macOS / Linux, local checkout)
+#
+# Usage from a cloned checkout:
+#   cd /path/to/vibeflow
+#   bash ./codex/install.sh
+#
+# Optional source root override:
+#   VIBEFLOW_SOURCE_ROOT=/path/to/vibeflow bash ./codex/install.sh
+#
+# After installation, restart Codex to activate new skills.
+
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_SOURCE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE_ROOT="${VIBEFLOW_SOURCE_ROOT:-${DEFAULT_SOURCE_ROOT}}"
 CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 INSTALL_DIR="${CODEX_HOME}/vibeflow"
 SKILLS_DIR="${CODEX_HOME}/skills"
-REPO_URL="https://github.com/ttttstc/vibeflow.git"
-REPO_NAME="ttttstc/vibeflow"
-REQUESTED_VERSION="${1:-${VIBEFLOW_VERSION:-latest}}"
 
-normalize_requested_version() {
-  local value="${1:-latest}"
-  if [[ -z "$value" || "$value" == "latest" ]]; then
-    printf 'latest\n'
-    return 0
-  fi
-  if [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-    printf 'v%s\n' "$value"
-    return 0
-  fi
-  printf '%s\n' "$value"
-}
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+RESET='\033[0m'
 
-extract_tag_name_from_json() {
-  local json="${1:-}"
-  if [[ -z "$json" ]]; then
-    return 0
-  fi
-  if command -v jq >/dev/null 2>&1; then
-    printf '%s' "$json" | jq -r '.tag_name // empty'
-    return 0
-  fi
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("tag_name",""))' <<<"$json" 2>/dev/null || true
-    return 0
-  fi
-  if command -v python >/dev/null 2>&1; then
-    python -c 'import json,sys; print(json.loads(sys.stdin.read()).get("tag_name",""))' <<<"$json" 2>/dev/null || true
-    return 0
-  fi
-  sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' <<<"$json" | head -n 1
-}
+info()    { echo -e "${CYAN}[INFO]${RESET} $*"; }
+success() { echo -e "${GREEN}[OK]${RESET} $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
-resolve_latest_version() {
-  local latest_tag=""
-  local release_json=""
+if [[ ! -d "$SOURCE_ROOT" ]]; then
+  error "source root not found: $SOURCE_ROOT"
+  exit 1
+fi
 
-  if command -v curl >/dev/null 2>&1; then
-    release_json="$(curl -fsSL "https://api.github.com/repos/${REPO_NAME}/releases/latest" 2>/dev/null || true)"
-  elif command -v wget >/dev/null 2>&1; then
-    release_json="$(wget -qO- "https://api.github.com/repos/${REPO_NAME}/releases/latest" 2>/dev/null || true)"
-  fi
+if ! command -v git >/dev/null 2>&1; then
+  error "git is required to install vibeflow for Codex."
+  exit 1
+fi
 
-  latest_tag="$(extract_tag_name_from_json "$release_json")"
-  if [[ -n "$latest_tag" && "$latest_tag" != "null" ]]; then
-    printf '%s\n' "$latest_tag"
-    return 0
-  fi
+get_source_version() {
+  local root="$1"
+  local plugin_json="${root}/.claude-plugin/plugin.json"
+  local marketplace_json="${root}/.claude-plugin/marketplace.json"
 
-  if command -v git >/dev/null 2>&1; then
-    latest_tag="$(git ls-remote --tags --refs --sort=-v:refname "$REPO_URL" 2>/dev/null | awk -F/ '{print $3}' | grep -E '^(v)?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' | head -n 1 || true)"
-    if [[ -n "$latest_tag" ]]; then
-      printf '%s\n' "$latest_tag"
+  if [[ -f "$plugin_json" ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      jq -r '.version // empty' "$plugin_json" 2>/dev/null || true
+      return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+      python3 - "$plugin_json" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+print(data.get("version", ""))
+PYEOF
+      return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+      python - "$plugin_json" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+print(data.get("version", ""))
+PYEOF
       return 0
     fi
   fi
 
-  printf 'main\n'
+  if [[ -f "$marketplace_json" ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      jq -r '.plugins[0].version // empty' "$marketplace_json" 2>/dev/null || true
+      return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+      python3 - "$marketplace_json" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+plugins = data.get("plugins") or []
+print((plugins[0] or {}).get("version", "") if plugins else "")
+PYEOF
+      return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+      python - "$marketplace_json" <<'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+plugins = data.get("plugins") or []
+print((plugins[0] or {}).get("version", "") if plugins else "")
+PYEOF
+      return 0
+    fi
+  fi
+
+  printf 'unknown\n'
 }
 
-if ! command -v git >/dev/null 2>&1; then
-  echo "ERROR: git is required to install vibeflow for Codex." >&2
+copy_local_tree() {
+  local source="$1"
+  local destination="$2"
+
+  mkdir -p "$destination"
+
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    [[ ! -e "${source}/${file}" ]] && continue
+    mkdir -p "$(dirname "${destination}/${file}")"
+    cp -p "${source}/${file}" "${destination}/${file}"
+  done < <(git -C "$source" ls-files -co --exclude-standard)
+}
+
+info "Installing vibeflow for Codex from local checkout..."
+info "Source root: $SOURCE_ROOT"
+
+mkdir -p "$CODEX_HOME" "$SKILLS_DIR"
+
+if [[ -d "$INSTALL_DIR" ]]; then
+  info "Removing existing installation at $INSTALL_DIR..."
+  rm -rf "$INSTALL_DIR"
+fi
+
+copy_local_tree "$SOURCE_ROOT" "$INSTALL_DIR"
+
+if [[ ! -d "${INSTALL_DIR}/skills" ]]; then
+  error "skills directory not found in local checkout"
   exit 1
 fi
 
-RESOLVED_REF="$(normalize_requested_version "$REQUESTED_VERSION")"
-if [[ "$RESOLVED_REF" == "latest" ]]; then
-  RESOLVED_REF="$(resolve_latest_version)"
-fi
-
-TMP_DIR="${INSTALL_DIR}.tmp.$$"
-cleanup() {
-  if [[ -d "$TMP_DIR" ]]; then
-    rm -rf "$TMP_DIR"
-  fi
-}
-trap cleanup EXIT
-
-echo "Installing vibeflow for Codex..."
-echo "  -> Requested version: ${REQUESTED_VERSION:-latest}"
-echo "  -> Resolved ref: ${RESOLVED_REF}"
-echo "  -> Downloading repository..."
-
-if ! git clone --depth 1 --branch "$RESOLVED_REF" "$REPO_URL" "$TMP_DIR"; then
-  echo "ERROR: Failed to download ref '${RESOLVED_REF}' from ${REPO_URL}" >&2
-  exit 1
-fi
-
-mkdir -p "${CODEX_HOME}" "${SKILLS_DIR}"
-rm -rf "${INSTALL_DIR}"
-mv "$TMP_DIR" "${INSTALL_DIR}"
-
-for skill_dir in "${INSTALL_DIR}"/skills/*; do
-  if [[ ! -d "$skill_dir" ]]; then
-    continue
-  fi
+find "${INSTALL_DIR}/skills" -mindepth 1 -maxdepth 1 -type d -print0 | while IFS= read -r -d '' skill_dir; do
   skill_name="$(basename "$skill_dir")"
   target_path="${SKILLS_DIR}/${skill_name}"
   rm -rf "$target_path"
   ln -s "$skill_dir" "$target_path"
 done
 
+installed_version="$(get_source_version "$INSTALL_DIR" | tr -d '\r\n')"
+
 echo ""
-echo "Done! vibeflow installed for Codex."
+success "VibeFlow installed for Codex."
 echo ""
-echo "  Repo   : ${INSTALL_DIR}"
-echo "  Skills : ${SKILLS_DIR}"
-if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
-  echo "  Version: $(<"${INSTALL_DIR}/VERSION")"
-fi
+echo "  Source:   $SOURCE_ROOT"
+echo "  Repo:     $INSTALL_DIR"
+echo "  Skills:   $SKILLS_DIR"
+echo "  Version:  ${installed_version}"
 echo ""
 echo "Restart Codex to activate new skills."

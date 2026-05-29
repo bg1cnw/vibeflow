@@ -12,7 +12,7 @@ description: 独立学习流。用于陌生领域学习、研究文章写作、�
 - 通过 `/vibeflow-learn` 激活
 - 不进入 `/vibeflow` 主链路阶段
 - 不写入 `.vibeflow/state.json`
-- 不复用 `Spark -> Design -> Tasks -> Build` 的阶段状态
+- 不复用 `Spark -> Design -> Stories -> Prototype -> Tasks -> Build` 的阶段状态
 
 它服务三类任务：
 
@@ -206,3 +206,13 @@ AI 不能做：
 - 已完成的产物文件
 - 下一步最该做什么
 - 哪些结论已经有 primary sources 支撑，哪些还没有
+---
+
+## 阶段收口审计规则
+
+当本 skill 结束并准备进入下一个流程时：
+
+1. 审计相关文档、链接和入口索引是否完整。
+2. 发现缺文档或缺链接时先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一流程。
