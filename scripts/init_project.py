@@ -42,7 +42,7 @@ _VIBEFLOW_REFERENCE_BODY = (
     "\n\n<!-- vibeflow -->\n"
     "## VibeFlow\n\n"
     "This project uses a multi-session agent workflow.\n"
-    "Flow: Spark → Design → Tasks → Build → Review → Test → Ship → Reflect.\n\n"
+    "Flow: Spark → Design → Stories → Prototype → Tasks → Build → Review → Test → Ship → Reflect.\n\n"
     "Incremental development: requests live under `.vibeflow/increments/`, active work packages live under `docs/changes/<change-id>/`.\n\n"
     "Key files: `docs/overview/CURRENT-STATE.md` (project snapshot), "
     "`docs/overview/ARCHITECTURE.md` (global architecture), "
@@ -413,7 +413,7 @@ def main():
     templates_dir = os.path.join(out_dir, "docs", "templates")
     os.makedirs(templates_dir, exist_ok=True)
     plugin_templates_dir = os.path.join(_PLUGIN_ROOT, "docs", "templates")
-    for template_name in ("st-case-template.md", "tasks-template.md"):
+    for template_name in ("st-case-template.md", "stories-template.md", "prototype-template.md", "tasks-template.md"):
         template_src = os.path.join(plugin_templates_dir, template_name)
         template_dst = os.path.join(templates_dir, template_name)
         if os.path.exists(template_src) and os.path.abspath(template_src) != os.path.abspath(template_dst):

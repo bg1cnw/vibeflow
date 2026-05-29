@@ -17,6 +17,8 @@ from vibeflow_paths import checkpoint_done, load_policy, load_state, path_contra
 PHASE_LABELS = {
     "spark": "Spark",
     "design": "Design",
+    "stories": "Stories",
+    "prototype": "Prototype",
     "tasks": "Tasks",
     "build": "Build",
     "review": "Review",
@@ -27,6 +29,9 @@ PHASE_LABELS = {
 ARTIFACT_LABELS = {
     "spark": "Spark artifact",
     "design": "Design artifact",
+    "stories": "Stories artifact",
+    "prototype": "Prototype artifact",
+    "ui_spec": "UI spec artifact",
     "tasks": "Tasks artifact",
     "review": "Review artifact",
     "system_test": "System test artifact",
@@ -85,6 +90,10 @@ def artifact_lookup(contract: dict) -> dict[str, Path]:
     lookup = dict(contract["artifacts"])
     lookup["feature_list"] = contract["feature_list"]
     lookup["release_notes"] = contract["release_notes"]
+    if "prototype" in lookup and "ui_spec" in lookup:
+        prototype_path = lookup["prototype"]
+        ui_spec_path = lookup["ui_spec"]
+        lookup["prototype"] = prototype_path if prototype_path.exists() else ui_spec_path
     return lookup
 
 
@@ -113,6 +122,9 @@ def evaluate_evidence(evidence: str, *, state: dict, contract: dict) -> tuple[bo
         artifact_name = evidence.split(":", 1)[1]
         path = artifact_lookup(contract).get(artifact_name)
         exists = bool(path and path.exists())
+        if artifact_name == "prototype" and not exists:
+            ui_spec = artifact_lookup(contract).get("ui_spec")
+            exists = bool(ui_spec and ui_spec.exists())
         label = ARTIFACT_LABELS.get(artifact_name, artifact_name)
         return exists, f"{label} {'exists' if exists else 'is missing'}."
 
@@ -132,7 +144,7 @@ def evaluate_evidence(evidence: str, *, state: dict, contract: dict) -> tuple[bo
 
     if evidence == "all_phases_complete":
         checkpoints = state.get("checkpoints") or {}
-        required = ["spark", "design", "tasks", "build", "review", "test"]
+        required = ["spark", "design", "stories", "prototype", "tasks", "build", "review", "test"]
         if _workflow_requires(contract["workflow"], "ship"):
             required.append("ship")
         if _workflow_requires(contract["workflow"], "reflect"):

@@ -25,7 +25,7 @@ from vibeflow_paths import (  # noqa: E402
 from validate_phase_invariants import validate_phase  # noqa: E402
 
 
-MANUAL_PHASES = {"increment", "spark", "design", "tasks", "quick"}
+MANUAL_PHASES = {"increment", "spark", "design", "stories", "prototype", "tasks", "quick"}
 OVERVIEW_DOC_KEYS = ("project", "architecture", "current_state")
 
 
@@ -100,8 +100,12 @@ def phase_open_files(contract: dict, phase: str) -> list[str]:
         return [str(artifacts["spark"])]
     if phase == "design":
         return [str(artifacts["spark"]), str(artifacts["design"])]
+    if phase == "stories":
+        return [str(artifacts["design"]), str(artifacts["stories"])]
+    if phase == "prototype":
+        return [str(artifacts["stories"]), str(artifacts["prototype"]), str(artifacts["ui_spec"])]
     if phase == "tasks":
-        return [str(artifacts["design"]), str(artifacts["tasks"])]
+        return [str(artifacts["prototype"]), str(artifacts["tasks"])]
     if phase == "build":
         return [str(artifacts["tasks"]), str(contract["feature_list"])]
     if phase == "review":
@@ -145,7 +149,11 @@ def next_action_for_phase(phase: str, reason: str, *, ui_required_flag: bool, sh
     if phase == "spark":
         return "默认先进入 vibeflow-office-hours 完成问题框定，并让用户确认本次验收标准；随后完成复杂度扫描，由用户决定是否做深度调研，必要时再进入圆桌讨论，最后总结方向与范围并确认是否进入 design。"
     if phase == "design":
-        return "完善 design.md，完成 eng/design review，并向用户展示本阶段产物与方案；只有在用户确认后才能进入 tasks。"
+        return "完善 design.md，完成 eng/design review，并向用户展示本阶段产物与方案；展示后等待用户确认，再进入 stories。"
+    if phase == "stories":
+        return "基于 brief.md + design.md 产出 stories.md，把用户/系统/极简行为合同定清楚；只有在 stories.md 确认后才能进入 prototype。"
+    if phase == "prototype":
+        return "基于 stories.md 生成可交互原型或流程仿真，并在 prototype.md / ui-spec.md 确认后进入 tasks。"
     if phase == "tasks":
         return "生成 execution-grade tasks.md，确保包含精确文件路径、验证步骤和回滚说明。"
     if phase == "build":
@@ -293,6 +301,9 @@ def legacy_detect_phase(project_root: Path, verbose: bool = False) -> dict:
         "artifacts": {
             "spark": project_root / "docs" / "changes" / "active" / "brief.md",
             "design": project_root / "docs" / "changes" / "active" / "design.md",
+            "stories": project_root / "docs" / "changes" / "active" / "stories.md",
+            "prototype": project_root / "docs" / "changes" / "active" / "prototype.md",
+            "ui_spec": project_root / "docs" / "changes" / "active" / "ui-spec.md",
             "tasks": project_root / "docs" / "changes" / "active" / "tasks.md",
             "review": project_root / "docs" / "changes" / "active" / "verification" / "review.md",
             "system_test": project_root / "docs" / "changes" / "active" / "verification" / "system-test.md",
@@ -333,6 +344,9 @@ def state_based_detect_phase(project_root: Path, verbose: bool = False) -> dict:
     checks.append(("increment", pending_increment, "increment queue " + ("pending" if pending_increment else "empty")))
     checks.append(("spark", not checkpoint_done(state, "spark") or not artifacts["spark"].exists(), f'spark={checkpoint_done(state, "spark")}, artifact={"exists" if artifacts["spark"].exists() else "missing"}'))
     checks.append(("design", not checkpoint_done(state, "design") or not artifacts["design"].exists(), f'design={checkpoint_done(state, "design")}, artifact={"exists" if artifacts["design"].exists() else "missing"}'))
+    checks.append(("stories", not checkpoint_done(state, "stories") or not artifacts["stories"].exists(), f'stories={checkpoint_done(state, "stories")}, artifact={"exists" if artifacts["stories"].exists() else "missing"}'))
+    prototype_artifact_exists = artifacts["prototype"].exists() or artifacts["ui_spec"].exists()
+    checks.append(("prototype", not checkpoint_done(state, "prototype") or not prototype_artifact_exists, f'prototype={checkpoint_done(state, "prototype")}, artifact={"exists" if prototype_artifact_exists else "missing"}'))
     checks.append(("tasks", not checkpoint_done(state, "tasks") or not artifacts["tasks"].exists(), f'tasks={checkpoint_done(state, "tasks")}, artifact={"exists" if artifacts["tasks"].exists() else "missing"}'))
     checks.append(("build", not has_active_features(feature_list) or not all_features_passing(feature_list), "build " + ("pending" if not all_features_passing(feature_list) else "complete")))
     checks.append(("review", not checkpoint_done(state, "review") or not artifacts["review"].exists(), f'review={checkpoint_done(state, "review")}, artifact={"exists" if artifacts["review"].exists() else "missing"}'))
@@ -403,52 +417,59 @@ def state_based_detect_phase(project_root: Path, verbose: bool = False) -> dict:
             if not design_validation["ok"]:
                 phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(design_validation, checks if verbose else None)
             else:
-                tasks_validation = evaluate_invariant("tasks")
-                if not tasks_validation["ok"]:
-                    phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(tasks_validation, checks if verbose else None)
-                elif not feature_list.exists():
-                    phase, reason = "build", "feature-list.json is missing."
-                    reason_code = "missing_artifact"
-                    blocking_item = "feature_list"
-                elif not has_active_features(feature_list):
-                    phase, reason = "build", "feature-list.json has no active features."
-                    reason_code = "missing_completion_evidence"
-                    blocking_item = "active_features"
-                elif not all_features_passing(feature_list):
-                    phase, reason = "build", "Some active features are not passing."
+                stories_validation = evaluate_invariant("stories")
+                if not stories_validation["ok"]:
+                    phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(stories_validation, checks if verbose else None)
                 else:
-                    review_validation = evaluate_invariant("review")
-                    if not review_validation["ok"]:
-                        phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(review_validation, checks if verbose else None)
-                    elif not checkpoint_done(state, "test") or not artifacts["system_test"].exists() or (flags["ui"] and not artifacts["qa"].exists()):
-                        phase = "test"
-                        if not artifacts["system_test"].exists():
-                            reason = "System test artifact is missing."
+                    prototype_validation = evaluate_invariant("prototype")
+                    if not prototype_validation["ok"]:
+                        phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(prototype_validation, checks if verbose else None)
+                    else:
+                        tasks_validation = evaluate_invariant("tasks")
+                        if not tasks_validation["ok"]:
+                            phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(tasks_validation, checks if verbose else None)
+                        elif not feature_list.exists():
+                            phase, reason = "build", "feature-list.json is missing."
                             reason_code = "missing_artifact"
-                            blocking_item = "system_test"
-                        elif flags["ui"] and not artifacts["qa"].exists():
-                            reason = "UI workflow requires QA artifact."
-                            reason_code = "missing_artifact"
-                            blocking_item = "qa"
-                        else:
-                            reason = "Test approval is missing."
-                            reason_code = "missing_approval"
-                            blocking_item = "test"
-                    elif flags["ship"]:
-                        ship_validation = evaluate_invariant("ship")
-                        if not ship_validation["ok"]:
-                            phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(ship_validation, checks if verbose else None)
-                        elif flags["reflect"] and (not checkpoint_done(state, "reflect") or latest_retro is None):
-                            phase = "reflect"
-                            reason = "Reflect is required and no retrospective exists."
+                            blocking_item = "feature_list"
+                        elif not has_active_features(feature_list):
+                            phase, reason = "build", "feature-list.json has no active features."
                             reason_code = "missing_completion_evidence"
-                            blocking_item = "reflect"
-                    elif flags["reflect"] and (not checkpoint_done(state, "reflect") or latest_retro is None):
-                        phase = "reflect"
-                        reason = "Reflect is required and no retrospective exists."
-                        reason_code = "missing_completion_evidence"
-                        blocking_item = "reflect"
-
+                            blocking_item = "active_features"
+                        elif not all_features_passing(feature_list):
+                            phase, reason = "build", "Some active features are not passing."
+                        else:
+                            review_validation = evaluate_invariant("review")
+                            if not review_validation["ok"]:
+                                phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(review_validation, checks if verbose else None)
+                            elif not checkpoint_done(state, "test") or not artifacts["system_test"].exists() or (flags["ui"] and not artifacts["qa"].exists()):
+                                phase = "test"
+                                if not artifacts["system_test"].exists():
+                                    reason = "System test artifact is missing."
+                                    reason_code = "missing_artifact"
+                                    blocking_item = "system_test"
+                                elif flags["ui"] and not artifacts["qa"].exists():
+                                    reason = "UI workflow requires QA artifact."
+                                    reason_code = "missing_artifact"
+                                    blocking_item = "qa"
+                                else:
+                                    reason = "Test approval is missing."
+                                    reason_code = "missing_approval"
+                                    blocking_item = "test"
+                            elif flags["ship"]:
+                                ship_validation = evaluate_invariant("ship")
+                                if not ship_validation["ok"]:
+                                    phase, reason, reason_code, blocking_item, invariant = apply_invariant_block(ship_validation, checks if verbose else None)
+                                elif flags["reflect"] and (not checkpoint_done(state, "reflect") or latest_retro is None):
+                                    phase = "reflect"
+                                    reason = "Reflect is required and no retrospective exists."
+                                    reason_code = "missing_completion_evidence"
+                                    blocking_item = "reflect"
+                            elif flags["reflect"] and (not checkpoint_done(state, "reflect") or latest_retro is None):
+                                phase = "reflect"
+                                reason = "Reflect is required and no retrospective exists."
+                                reason_code = "missing_completion_evidence"
+                                blocking_item = "reflect"
     result = {
         "phase": phase,
         "reason": reason,
@@ -469,6 +490,9 @@ def state_based_detect_phase(project_root: Path, verbose: bool = False) -> dict:
             "spark": str(artifacts["spark"]),
             "ucd": str(artifacts["ucd"]),
             "design": str(artifacts["design"]),
+            "stories": str(artifacts["stories"]),
+            "prototype": str(artifacts["prototype"]),
+            "ui_spec": str(artifacts["ui_spec"]),
             "tasks": str(artifacts["tasks"]),
             "review": str(artifacts["review"]),
             "system_test": str(artifacts["system_test"]),

@@ -36,10 +36,10 @@ SRS 描述系统**做什么**。设计文档描述**怎么做**。即使需求�
 6. **AI 深度审查** — eng review + design review（用户审批后执行）
 7. **范围决策** — 基于三方意见判断范围是否需要调整
 8. **编写设计文档** — 保存到 `docs/changes/<change-id>/design.md`
-9. **阶段收口确认** — 展示本阶段产物和方案，由用户确认是否进入 tasks
-10. **过渡到 tasks** — 进入 `vibeflow-tasks` 生成全量交付计划，并停在人工确认闸门
+9. **阶段收口确认** — 展示本阶段产物和方案，由用户确认是否进入 stories
+10. **过渡到 stories** — 进入 `vibeflow-stories` 生成行为合同，并停在人工确认闸门
 
-**终止状态是进入 `vibeflow-tasks`，并在 `tasks` 人工确认通过前不得进入 `build`。**
+**终止状态是进入 `vibeflow-stories`，并在 `stories` 人工确认通过前不得进入 `prototype`。**
 
 ## 步骤 0：问题探索（仅当无 SRS 或问题不清晰时）
 
@@ -127,7 +127,32 @@ SRS 描述系统**做什么**。设计文档描述**怎么做**。即使需求�
 
 ### 1.2 生成 UCD 内容（如不存在且需要 UI）
 
-当 SRS 有 UI 需求且无现有 UCD 文档时，执行以下子步骤生成风格指南：
+当 SRS 有 UI 需求且无现有 UCD 文档时，执行以下子步骤生成风格指南。
+
+在进入具体 Token 生成前，**必须先加载以下外部参考技能的方法论**：
+
+#### 1.2.0-pre 视觉设计参考技能
+
+##### ui-ux-pro-max
+
+在定义视觉风格方向和生成 Token 时，必须参考 ui-ux-pro-max 的下述能力：
+- **50 种风格库** — 从风格矩阵中选取 2-3 个候选风格作为 UCD 视觉方向选项的来源，避免仅凭个人偏好拍板
+- **21 套调色板** — 为步骤 1.2.2 的 Token 生成提供经过验证的调色板选项，确保所有对比度满足 WCAG AA
+- **50 组字体配对** — 为排版 Token 提供 display font + text font 配对方案，避免使用 Inter/Roboto/system-ui 等通用字体
+- **9 个技术栈模板** — 根据项目技术栈（React/Vue/Next.js/Svelte/SwiftUI/Flutter/Tailwind/shadcn-ui）选择对应的样式落地策略
+- **20 种图表样式** — 如果项目涉及数据可视化，直接引用其图表配色模板
+
+##### theme-factory
+
+在生成风格 Token 时，必须参考 theme-factory 的下述能力：
+- **10 个预设主题** — Ocean Depths / Sunset Boulevard / Forest Canopy / Modern Minimalist / Golden Hour / Arctic Frost / Desert Rose / Tech Innovation / Botanical Garden / Midnight Galaxy
+- **每主题包含** — 完整色板（hex 码）、header/body 字体配对、视觉身份定位
+- **使用方式** — 当用户未明确指定审美方向时，从 10 个主题中筛选 2-3 个契合项目调性的作为风格选项展示
+- **自定义主题** — 如 10 个预设均不匹配，参考其主题结构（色板+字体+视觉定位）即时生成新主题
+
+**合成原则：** ui-ux-pro-max 提供风格广度和技术落地参考，theme-factory 提供开箱即用的成品主题。两者共同输入，但最终 UCD Token 必须锚定项目自身的 SRS 约束和用户画像，不机械照搬。
+
+---
 
 **前端设计约束加载：**
 
@@ -438,7 +463,31 @@ Skill: vibeflow-plan-design-review
 - 设计文档必须包含且只包含一个可解析的 `Build Contract` TOML 代码块
 - 每个可实施 feature 必须包含一个可解析的 `Implementation Contract` TOML 代码块
 - `Implementation Contract` 至少要写出：`feature_id`、`title`、`priority`、`dependencies`、`file_scope`、`verification_commands` 或 `verification_steps`
-- Build 阶段以这些 TOML 契约作为 feature 权威输入；`tasks.md` 由下一阶段 `vibeflow-tasks` 单独生成，用来回答“如何按稳定顺序落地”
+- Build 阶段以这些 TOML 契约作为 feature 权威输入；`tasks.md` 由下一阶段 `vibeflow-tasks` 单独生成，用来回答”如何按稳定顺序落地”
+
+## 步骤 8.5：阶段审计（必须执行）
+
+在收口确认前，必须对 Design 阶段全部产物进行自审计。使用 Agent 工具启动审计：
+
+```
+Agent: explore — 审计 Design 阶段产物
+检查项：
+1. design.md 是否包含全部必需章节（架构逻辑视图/组件图/数据模型ER图/API设计/关键功能类图+行为图/UI-UX方案/第三方依赖+版本/测试策略/开发计划）
+2. design.md 是否包含 Build Contract + 每个 feature 的 Implementation Contract
+3. ucd.md 是否存在（如有UI需求）且包含颜色/排版/间距/圆角/阴影/动效/页面清单/组件规格/空态文案
+4. state.json design checkpoint + artifact 路径是否正确
+5. 版本号是否自洽（design.md / ucd.md 页眉页脚一致）
+6. API 端点是否覆盖所有 stories 中的用户操作（如有stories）
+7. 功能分解表 Feature ID 是否从 F01 连续无跳号
+8. 所有 Mermaid 图表语法是否正确
+```
+
+**审计规则**：
+- 缺章节 → 自己补上
+- 缺图表 → 自己补上
+- 版本号不一致 → 自己统一
+- 补完后 → 再审计
+- 直到全部通过 → 进入收口确认
 
 ## 步骤 9：阶段收口确认
 
@@ -448,21 +497,22 @@ Skill: vibeflow-plan-design-review
 - Engineering Review 结论
 - Design Review 结论
 - 最终范围决策
+- 阶段审计结果（通过项数/总项数）
 
 然后明确请用户确认：
 - 是否接受本阶段产物
-- 是否进入 `tasks`
+- 是否进入 `stories`
 
-**未确认前不得进入 `tasks`。**
+**未确认前不得进入 `stories`。**
 
-## 步骤 10：过渡到 tasks
+## 步骤 10：过渡到 stories
 
 设计文档保存并提交后：
 
 1. 总结初始化需要的关键输入：
    - **来自 SRS**：约束、假设、NFR、用户画像、术语表、功能需求 -> 功能清单
    - **来自设计**：技术栈、架构决策 -> `tech_stack`、项目骨架
-2. 在用户确认后进入 `vibeflow-tasks` 生成执行级任务计划
+2. 在用户确认后进入 `vibeflow-stories` 生成行为合同
 
 ## 图表要求
 
@@ -491,7 +541,7 @@ Skill: vibeflow-plan-design-review
 
 **调用者：** vibeflow-router（design 阶段）
 **依赖：** `docs/changes/<change-id>/brief.md`；可选 `docs/changes/<change-id>/ucd.md`
-**链接到：** vibeflow-tasks（scope decision 通过后）
+**链接到：** vibeflow-stories（design 确认后）
 **产出：**
 - `docs/changes/<change-id>/design.md`（设计文档，含 UI/UX 章节、工程审查、设计审查与范围决策）
 
@@ -501,3 +551,13 @@ Skill: vibeflow-plan-design-review
 - SRS 无 UI 需求或 template 为 api-standard/prototype：跳过 UCD，告知用户
 - 无论 UCD 是读取还是生成，最终都内联到设计文档的 UI/UX 章节中
 - 当前端/UI 适用时，必须额外遵守 `skills/vibeflow-design/references/frontend-design-constraints.md`
+---
+
+## 阶段收口审计规则
+
+当本 skill 结束并准备进入下一个流程时：
+
+1. 审计相关文档、链接和入口索引是否完整。
+2. 发现缺文档或缺链接时先自动补齐。
+3. 补齐后再次审计。
+4. 直到全部补齐再进入下一流程。
